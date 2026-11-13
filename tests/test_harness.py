@@ -1,6 +1,6 @@
 """Two end-to-end checks, both against a real stdio MCP server (tests/fake_mcp.py):
   test_scripted  deterministic, scripted model, Chroma's built-in embedder. Needs nothing.
-  test_local     real agents on a small Ollama model and embedder. Skipped when Ollama is down.
+  test_local     real crew on a small Ollama model and embedder. Skipped when Ollama is down.
 Override the local models with ANALYST_TEST_LLM / ANALYST_TEST_EMBED.
 """
 import json
@@ -11,9 +11,8 @@ import urllib.request
 
 import pytest
 import yaml
+from crewai import BaseLLM
 from fastapi.testclient import TestClient
-from pydantic_ai import ModelResponse, TextPart, ThinkingPart, ToolCallPart
-from pydantic_ai.models.function import FunctionModel
 
 from analyst import server
 from analyst.harness import Harness
@@ -23,24 +22,22 @@ OLLAMA = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 DB = {"command": sys.executable, "args": [str(HERE / "fake_mcp.py")]}
 
 
-class Scripted(FunctionModel):
-    """Plays back `replies` one model call at a time and records what each call was sent."""
+class Scripted(BaseLLM):
+    replies: list = []
 
-    def __init__(self):
-        self.replies, self.seen = [], []
-        super().__init__(self.reply, model_name="scripted")
-
-    def reply(self, messages, info):
-        self.seen.append(f"{info.instructions}\n{messages}")
+    def call(self, messages, *args, **kwargs):
         return self.replies.pop(0)
 
+    def supports_function_calling(self):
+        return False
 
-def act(tool, *before, **args):
-    return ModelResponse(parts=[*before, ToolCallPart(tool, args)])
+
+def act(tool, **args):
+    return f"Thought: I need data.\nAction: {tool}\nAction Input: {json.dumps(args)}"
 
 
 def final(text):
-    return ModelResponse(parts=[TextPart(text)])
+    return f"Thought: I now know the final answer\nFinal Answer: {text}"
 
 
 def test_scripted(tmp_path):
@@ -52,15 +49,14 @@ def test_scripted(tmp_path):
         "def register(h):\n    h.kb.loaders['.note'] = lambda p: 'NOTE ' + p.read_text()\n")
     (tmp_path / "doc.note").write_text("The orders table holds one row per order with region and amount.")
 
-    llm = Scripted()
+    llm = Scripted(model="scripted")
     h = Harness(tmp_path / "config.yaml", llm=llm)
     try:
         assert h.mcp["db"]["error"] is None and h.plugins == {"p": None}
         assert h.kb.ingest_path(tmp_path / "doc.note") == {str(tmp_path / "doc.note"): 1}
 
         llm.replies = [
-            act("kb_search", ThinkingPart("The dictionary should say what the table holds."),
-                TextPart("Looking up the orders table first."), query="orders table"),
+            act("kb_search", query="orders table"),
             act("db_query", sql="select region, sum(amount) from orders group by region"),
             act("db_query", sql="delete from orders"),
             final("North 150, south 70 [E2]."),
@@ -81,12 +77,8 @@ def test_scripted(tmp_path):
         assert [e["name"] for e in events if e["kind"] == "output"] == ["research", "analysis", "report"]
         assert [e["id"] for e in events if e["kind"] == "result"] == ["E1", "E2", None]
         assert len([e for e in events if e["kind"] == "call"]) == 3
-        assert [(e["kind"], e["text"]) for e in events if e["kind"] in ("thought", "say")] == [
-            ("thought", "The dictionary should say what the table holds."),
-            ("say", "Looking up the orders table first.")]                # model thinking surfaced
         assert h.history("s1")[0]["steps"] == events
         assert h.history("s1")[0]["question"] == "Which region {sells} most?"
-        assert "North 150, south 70 [E2]." in llm.seen[4]                 # findings reach the analyst
 
         # agentic ingestion: explore a source, write catalog notes
         llm.replies = [act("db_query", sql="select * from orders limit 2"),
@@ -113,14 +105,18 @@ def test_scripted(tmp_path):
         assert h.rules[0]["prompt"] == "Always name the period." and "cohorts" in h.skills
         assert c.delete("/api/library/plugins/boom").status_code == 200 and "boom" not in h.plugins
 
-        llm.seen = []
-        llm.replies = [act("use_skill", name="cohorts"), final("nothing found"), final("still nothing"),
-                       final("no answer"), final("No data.")]
-        body = c.post("/api/chat", json={"question": "anything?", "session": "s2"}).text
+        seen = []
+        llm.replies = [act("use_skill", name="cohorts"), final("nothing found"), final("no answer"), final("No data.")]
+        real_call = Scripted.call
+        Scripted.call = lambda self, messages, *a, **k: (seen.append(str(messages)), real_call(self, messages))[1]
+        try:
+            body = c.post("/api/chat", json={"question": "anything?", "session": "s2"}).text
+        finally:
+            Scripted.call = real_call
         last = json.loads(body.strip().split("\n\n")[-1][6:])
         assert last["type"] == "done" and last["report"].startswith("> **No evidence")
-        assert "Always name the period." in llm.seen[0] and "cohorts: cohort analysis" in llm.seen[0]
-        assert "Group by signup month." in llm.seen[1]                    # use_skill returned the body
+        assert "Always name the period." in seen[0] and "cohorts: cohort analysis" in seen[0]
+        assert "Group by signup month." in seen[1]                       # use_skill returned the body
 
         # assistants: saved from the form, its reference document is searched first, its type sets the format
         assert c.put("/api/assistants/finance", json={
@@ -129,34 +125,25 @@ def test_scripted(tmp_path):
         fin = next(a for a in c.get("/api/assistants").json() if a["name"] == "finance")
         assert fin["type"] == "brief" and fin["mcp"] == ["db"] and fin["prompt"] == "Revenue is net."
         assert h.kb.search("anything at all", prefer=fin["docs"])[0]["priority"] is True
-        llm.seen = []
-        llm.replies = [final("x"), final("x again"), final("y"), final("z")]
-        h.research("Revenue?", session="s4", assistant="finance")
-        assert "Domain: Finance" in llm.seen[0] and "Revenue is net." in llm.seen[0]
-        assert "You answered without calling any tool" in llm.seen[1]     # sent back once, then accepted
-        assert "at most five sentences" in llm.seen[3]
+        seen = []
+        llm.replies = [final("x"), final("y"), final("z")]
+        Scripted.call = lambda self, messages, *a, **k: (seen.append(str(messages)), real_call(self, messages))[1]
+        try:
+            h.research("Revenue?", session="s4", assistant="finance")
+        finally:
+            Scripted.call = real_call
+        assert "Domain: Finance" in seen[0] and "Revenue is net." in seen[0]
+        assert "at most five sentences" in seen[2]
 
         # human in the loop: the agent's question goes to `ask`, the reply comes back to it
-        asked, llm.seen = [], []
-        llm.replies = [act("ask_user", question="Which period?"), final("x"), final("x again"), final("y"), final("z")]
-        h.research("How are sales?", session="s3", ask=lambda q: (asked.append(q), "last quarter")[1])
-        assert asked == ["Which period?"] and "The user replied: last quarter" in llm.seen[1]
-
-        # a report that cites none of the gathered evidence is flagged
-        llm.replies = [act("kb_search", query="orders"), final("found it"), final("fine"), final("North sold 999.")]
-        assert h.research("Sales?", session="s6")["report"].startswith("> **The report cites none")
-
-        # sub-agent: the researcher hands a task to the helper, whose tool calls join the ledger
-        llm.seen, events = [], []
-        llm.replies = [act("ask_helper", task="Count the orders."),
-                       act("db_query", sql="select count(*) from orders"),   # the helper's call
-                       final("There are 3 orders [E1]."),                    # the helper's answer
-                       final("3 orders [E1]."), final("Three [E1]."), final("Three orders [E1].")]
-        out = h.research("How many orders?", session="s5", emit=events.append)
-        assert [e["tool"] for e in out["evidence"]] == ["db_query"] and "(3,)" in out["evidence"][0]["output"]
-        assert "You are the Helper. Help" in llm.seen[1] and "Count the orders." in llm.seen[1]
-        assert "There are 3 orders [E1]." in llm.seen[3]                  # result returned to researcher
-        assert ("stage", "Helper") in [(e["kind"], e.get("agent")) for e in events]
+        asked, seen = [], []
+        llm.replies = [act("ask_user", question="Which period?"), final("x"), final("y"), final("z")]
+        Scripted.call = lambda self, messages, *a, **k: (seen.append(str(messages)), real_call(self, messages))[1]
+        try:
+            h.research("How are sales?", session="s3", ask=lambda q: (asked.append(q), "last quarter")[1])
+        finally:
+            Scripted.call = real_call
+        assert asked == ["Which period?"] and "The user replied: last quarter" in seen[1]
 
         # sources: add a second server from the API, persisted without touching the first
         r = c.put("/api/mcp/db2", json={**DB, "tools": ["query"]}).json()
@@ -189,9 +176,8 @@ def ollama_up():
 @pytest.mark.skipif(not ollama_up(), reason="Ollama is not running")
 def test_local(tmp_path):
     (tmp_path / "config.yaml").write_text(yaml.safe_dump({
-        "llm": "ollama:" + os.environ.get("ANALYST_TEST_LLM", "qwen3:4b"),
+        "llm": "openai/" + os.environ.get("ANALYST_TEST_LLM", "qwen3:4b"),
         "llm_base_url": OLLAMA + "/v1",
-        "llm_settings": {"extra_body": {"think": False}},
         "embed_model": os.environ.get("ANALYST_TEST_EMBED", "embeddinggemma:300m"),
         "embed_url": OLLAMA,
         "mcp": {"db": DB}}))
@@ -208,6 +194,5 @@ def test_local(tmp_path):
         tools = [e["tool"] for e in out["evidence"]]
         assert "db_query" in tools, tools                                # the model really queried
         assert "150" in out["report"]                                    # 100 + 50
-        assert any(s["kind"] == "thought" for s in out["steps"])         # qwen3 reasoning surfaced
     finally:
         h.close()

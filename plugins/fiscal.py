@@ -1,6 +1,8 @@
 """Fiscal calendar tools. The fiscal year starts on 1 April and is named after the year it ends."""
 import datetime
 
+from crewai.tools import tool
+
 
 def quarter_of(day: datetime.date) -> str:
     fy = day.year + 1 if day.month >= 4 else day.year
@@ -19,6 +21,7 @@ def bounds(fiscal_quarter: str) -> tuple[datetime.date, datetime.date]:
     return start, end
 
 
+@tool("fiscal_period")
 def fiscal_period(value: str) -> str:
     """Convert between dates and fiscal quarters. Give a date (2026-08-15) to get its fiscal
     quarter, or a fiscal quarter (FY2027-Q2) to get its first and last dates."""

@@ -4,7 +4,7 @@ Guidance for coding agents working in this repository.
 
 ## What this is
 
-Analyst is an evidence-first research harness on pydantic-ai. A question goes through three agents
+Analyst is an evidence-first research harness on CrewAI. A question goes through three agents
 in sequence: a researcher (knowledge-base search, then MCP data sources), an analyst, and a
 report writer. Every tool result gets an evidence id (`E1`, `E2`, …) that the report must cite.
 A FastAPI server exposes the harness and a single-page web app manages it.
@@ -13,7 +13,7 @@ A FastAPI server exposes the harness and a single-page web app manages it.
 
 | Path | What |
 |---|---|
-| `analyst/harness.py` | `Harness`: config and extension loading, MCP connections, `research()`, `catalog()`, the evidence ledger (`Run`, `Evidenced` toolset wrapper) |
+| `analyst/harness.py` | `Harness`: config and extension loading, MCP connections, `research()`, `catalog()`, the evidence ledger (`Run`) |
 | `analyst/kb.py` | Knowledge base on Chroma: chunking, file and URL ingestion, search with priority sources |
 | `analyst/server.py` | HTTP API, server-sent events for runs, management endpoints |
 | `analyst/static/` | Web app: `index.html`, `app.css`, `app.js` (no build step, no framework) |
@@ -31,14 +31,12 @@ uv sync                                 # .venv, locked dependencies, pytest, `a
 uv run analyst serve                    # http://127.0.0.1:8000
 uv run analyst ingest examples/docs
 uv run pytest -k scripted               # fast, needs nothing external
-uv run pytest -k local                  # real agents on Ollama; several minutes
+uv run pytest -k local                  # real crew on Ollama; several minutes
 uv run python plugins/fiscal.py         # plugin self-check
 ```
 
 Add dependencies with `uv add <package>` (or `uv add --dev`) so `uv.lock` stays in step.
-`tests/test_harness.py` scripts the model with pydantic-ai's `FunctionModel`, so the scripted test
-needs no model server. pydantic-ai 2.x and MCP 2.x APIs differ from 1.x; check the installed
-package (it ships its own `AGENTS.md`) before relying on remembered signatures.
+`tests/conftest.py` turns off CrewAI tracing and telemetry for test runs.
 
 ## Conventions
 
@@ -51,10 +49,6 @@ package (it ships its own `AGENTS.md`) before relying on remembered signatures.
 - Run events are `{"type": "step", "kind": ...}` with kinds `stage`, `thought`, `say`, `call`,
   `result`, `skill`, `ask`, `reply`, `output`. They are saved with each turn and replayed.
 - A broken plugin or an unreachable MCP server must be reported, never crash the harness.
-- Agents and MCP connections live on the harness's private asyncio loop; callers on other
-  threads go through `Harness._sync`. Each MCP connection is opened and closed by one task.
-- Every tool that produces evidence sits inside an `Evidenced` toolset. Plugin tools are
-  plain functions; their name, type hints and docstring are what the model sees.
 - Management endpoints can run code. They stay behind the `admin` dependency in `server.py`.
 
 ## Before finishing a change

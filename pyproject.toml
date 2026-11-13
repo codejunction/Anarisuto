@@ -1,18 +1,16 @@
 [project]
 name = "analyst"
 version = "0.1.0"
-description = "Evidence-first research analyst harness on pydantic-ai"
+description = "Evidence-first research analyst harness on CrewAI"
 requires-python = ">=3.10,<3.14"
 dependencies = [
+    "crewai[anthropic]>=1.15",
+    "crewai-tools[mcp]>=1.15",
     "fastapi",
     "uvicorn",
     "python-multipart",
     "pypdf",
     "ollama",  # Ollama embeddings (embed_model in config.yaml)
-    "pydantic-ai-slim[anthropic,mcp,openai]>=2.54.0",
-    "chromadb>=1.5.9",
-    "pyyaml>=6.0.3",
-    "httpx>=0.28.1",
 ]
 
 [project.scripts]
