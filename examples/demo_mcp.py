@@ -9,7 +9,7 @@ import datetime as dt
 import random
 import sqlite3
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 REGIONS = ["north", "south", "east", "west"]
 PRODUCTS = [  # id, name, category, unit price
@@ -71,7 +71,7 @@ def build():
 
 
 db = build()
-mcp = FastMCP("demo-sales")
+mcp = MCPServer("demo-sales")
 
 
 @mcp.tool()

@@ -66,7 +66,7 @@ def index():
 @app.get("/api/meta")
 def meta():
     return {
-        "llm": h.cfg.get("llm", "anthropic/claude-opus-5-5"),
+        "llm": h.cfg.get("llm", "anthropic:claude-opus-5-5"),
         "llm_base_url": h.cfg.get("llm_base_url", ""),
         "assistants": assistants(),
         "mcp": [{"name": n, "tools": len(s["tools"]), "error": s["error"]} for n, s in h.mcp.items()],

@@ -348,7 +348,7 @@ const KINDS = {
   skills: { label: 'Skills', blurb: 'Step-by-step instructions the researcher loads only when a question calls for them.',
     template: '---\ndescription: When this skill applies\n---\n1. \n' },
   plugins: { label: 'Plugins', blurb: 'Python that runs inside the harness with its full permissions: tools, file loaders, extra sources.',
-    template: 'from crewai.tools import tool\n\n\n@tool("my_tool")\ndef my_tool(text: str) -> str:\n    """Say what the tool does and when to use it."""\n    return text\n\n\ndef register(harness):\n    harness.tools.append(my_tool)\n' },
+    template: 'def my_tool(text: str) -> str:\n    """Say what the tool does and when to use it."""\n    return text\n\n\ndef register(harness):\n    harness.tools.append(my_tool)\n' },
 };
 let kind = 'agents', current = null;
 function editItem(name, content, error) {

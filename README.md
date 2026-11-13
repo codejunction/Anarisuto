@@ -1,6 +1,6 @@
 # Analyst
 
-A research harness on CrewAI that answers data questions with evidence. A researcher agent looks
+A research harness on pydantic-ai that answers data questions with evidence. A researcher agent looks
 up what the data means in a knowledge base, queries your sources over MCP, then an analyst and a
 report writer turn the results into a cited report. Every tool result gets an id (`[E3]`) and the
 report must cite those ids; citations that match no result are flagged.
@@ -75,12 +75,21 @@ reverse proxy every request looks local, so set the token there.
 
 ## Local models
 
-`config.yaml` ships pointing at Ollama: `llm: openai/qwen3:4b` with
+`config.yaml` ships pointing at Ollama: `llm: ollama:qwen3:4b` with
 `llm_base_url: http://localhost:11434/v1`, and `embed_model: embeddinggemma:300m`. A question
-takes several minutes on a 4B model. For a hosted model set `llm: anthropic/claude-opus-5-5`
+takes several minutes on a 4B model. For a hosted model set `llm: anthropic:claude-opus-5-5`
 (with `ANTHROPIC_API_KEY`) and remove `llm_base_url`, here or under Settings. Remove
 `embed_model` to use Chroma's built-in embedder; each embedder has its own collection, so
-switching means ingesting again. `uv run pytest -k local` runs the real crew on Ollama.
+switching means ingesting again. `uv run pytest -k local` runs the real agents on Ollama.
+Model names are pydantic-ai's `provider:model` form; any provider pydantic-ai supports works
+once its API key is set, and `llm_base_url` serves an `ollama:` or OpenAI-compatible model from
+that address. `llm_settings` passes pydantic-ai model settings (`max_tokens`,
+`extra_body`, …) to every agent.
+
+Small local models need room to think. Ollama gives a model 4096 tokens of context by default;
+a reasoning model like qwen3 can fill that with its own thinking and lose the question. The
+shipped config sends `think: false`, which keeps qwen3's reasoning short. If your GPU has the
+memory, start Ollama with `OLLAMA_CONTEXT_LENGTH=16384` instead and drop that setting.
 
 An MCP source with `command: python` runs with the interpreter that runs the harness.
 

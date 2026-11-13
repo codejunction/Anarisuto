@@ -1,7 +1,11 @@
 # Local setup: small Ollama model and embedder. For a hosted model, set
-#   llm: anthropic/claude-opus-5-5   (needs ANTHROPIC_API_KEY) and remove llm_base_url.
-llm: openai/qwen3:4b
+#   llm: anthropic:claude-opus-5-5   (needs ANTHROPIC_API_KEY) and remove llm_base_url.
+llm: ollama:qwen3:4b
 llm_base_url: http://localhost:11434/v1
+# pydantic-ai model settings for every agent. `think: false` keeps qwen3's reasoning short
+# (it still shows in the working notes) so it fits Ollama's default 4096-token context.
+llm_settings:
+  extra_body: {think: false}
 embed_model: embeddinggemma:300m
 data_dir: data
 max_tool_output: 20000

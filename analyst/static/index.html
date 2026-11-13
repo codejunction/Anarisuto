@@ -126,7 +126,7 @@
     <section class="view page" id="v-settings" hidden>
       <header class="page-head"><div><h1>Settings</h1><p>Saved to config.yaml next to the harness.</p></div></header>
       <form id="settings" class="fields">
-        <label>Model <input id="llm" required><small>A CrewAI model name, for example anthropic/claude-opus-5-5.</small></label>
+        <label>Model <input id="llm" required><small>provider:model, for example anthropic:claude-opus-5-5 or ollama:qwen3:4b.</small></label>
         <label>Endpoint <input id="llm-base" placeholder="optional"><small>OpenAI-compatible base URL, for example http://localhost:11434/v1 for Ollama.</small></label>
         <div class="actions"><button class="btn">Save</button></div>
       </form>
