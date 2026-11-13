@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Analyst</title>
+<script>try { const t = localStorage.theme; if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch {}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap">
+<link rel="stylesheet" href="/static/app.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
+</head>
+<body>
+<div class="shell">
+  <nav class="rail" aria-label="Main">
+    <a class="mark" href="#/desk">Analyst<span>Research desk</span></a>
+    <ol class="nav">
+      <li><a href="#/desk"><i>01</i>Desk</a></li>
+      <li><a href="#/assistants"><i>02</i>Assistants</a></li>
+      <li><a href="#/sources"><i>03</i>Sources</a></li>
+      <li><a href="#/library"><i>04</i>Library</a></li>
+      <li><a href="#/documents"><i>05</i>Documents</a></li>
+      <li><a href="#/settings"><i>06</i>Settings</a></li>
+    </ol>
+    <section class="convos">
+      <h2>Conversations <button class="link" id="new-convo" type="button">New</button></h2>
+      <ul id="convos"></ul>
+    </section>
+    <footer id="rail-foot">
+      <div class="theme" role="group" aria-label="Theme">
+        <button type="button" data-theme="light">Light</button><button type="button" data-theme="dark">Dark</button><button type="button" data-theme="system">System</button>
+      </div>
+      <div id="model"></div>
+    </footer>
+  </nav>
+
+  <main>
+    <section class="view" id="v-desk">
+      <div id="turns"></div>
+      <form id="ask" class="composer">
+        <textarea id="q" rows="2" placeholder="Ask the desk a question" aria-label="Question" required></textarea>
+        <div class="composer-foot">
+          <details class="picker" id="picker">
+            <summary><span>Assistant</span><b id="picked">default</b></summary>
+            <div class="menu" id="picker-menu" role="menu"></div>
+          </details>
+          <button class="btn" id="send">Ask</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="view page" id="v-assistants" hidden>
+      <header class="page-head">
+        <div><h1>Assistants</h1><p>An assistant is the desk set up for one kind of work: its instructions, the sources it may query, and the documents it reads first.</p></div>
+        <button class="btn" id="new-assistant" type="button">New assistant</button>
+      </header>
+      <div class="split">
+        <div class="list"><ul id="assistants"></ul></div>
+        <form class="fields" id="assistant-form">
+          <label>Name <input name="name" pattern="[\w\-]+" required placeholder="letters, digits, - and _"></label>
+          <label>Description <input name="description" placeholder="Shown when choosing an assistant"></label>
+          <label>Domain <input name="domain" placeholder="Sales, Finance, Supply chain…"></label>
+          <fieldset class="choice stack">
+            <legend>Answers as</legend>
+            <label><input type="radio" name="type" value="report" checked> <span><b>Full report</b> Answer, findings, method, caveats.</span></label>
+            <label><input type="radio" name="type" value="brief"> <span><b>Brief answer</b> A few cited sentences.</span></label>
+            <label><input type="radio" name="type" value="table"> <span><b>Data table</b> The figures first, notes under them.</span></label>
+          </fieldset>
+          <label>Instructions <textarea name="prompt" rows="9" spellcheck="false" placeholder="Definitions, conventions and priorities for this domain. For example: revenue means net of refunds; the fiscal year starts on 1 April."></textarea></label>
+          <fieldset class="choice stack"><legend>Sources it may query</legend><div id="a-mcp" class="ticks"></div><small>Tick none to allow every source.</small></fieldset>
+          <fieldset class="choice stack"><legend>Reference documents</legend><div id="a-docs" class="ticks"></div><small>Searched first, ahead of the rest of the knowledge base.</small></fieldset>
+          <div class="actions">
+            <button class="btn">Save</button>
+            <button class="btn quiet" id="use-assistant" type="button">Use on the desk</button>
+            <button class="link danger" id="delete-assistant" type="button">Delete</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section class="view page" id="v-sources" hidden>
+      <header class="page-head">
+        <div><h1>Sources</h1><p>MCP servers the researcher may query. Give them read-only credentials.</p></div>
+        <button class="btn" id="add-source" type="button">Add source</button>
+      </header>
+      <table class="grid" id="sources"><thead><tr><th>Name</th><th>Connection</th><th>Tools</th><th></th></tr></thead><tbody></tbody></table>
+    </section>
+
+    <section class="view page" id="v-library" hidden>
+      <header class="page-head"><div><h1>Library</h1><p id="kind-blurb"></p></div></header>
+      <div class="tabs" id="kinds" role="tablist"></div>
+      <div class="split">
+        <div class="list">
+          <ul id="items"></ul>
+          <button class="link" id="new-item" type="button">+ New</button>
+        </div>
+        <form class="editor" id="editor">
+          <label>Name <input id="item-name" pattern="[\w\-]+" required placeholder="letters, digits, - and _"></label>
+          <textarea id="item-body" spellcheck="false" aria-label="Content"></textarea>
+          <p class="error" id="item-error" hidden></p>
+          <div class="actions">
+            <button class="btn">Save</button>
+            <button class="link danger" id="delete-item" type="button">Delete</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section class="view page" id="v-documents" hidden>
+      <header class="page-head"><div><h1>Documents</h1><p>What the desk has read. Searched before any source is queried.</p></div></header>
+      <div class="intake">
+        <label class="drop" id="drop">
+          <input type="file" id="files" multiple hidden>
+          <strong>Add files</strong><span>Drop them here or click. PDF and any text format.</span>
+        </label>
+        <form id="url-form" class="url">
+          <label>Web page <input id="url" type="url" placeholder="https://" required></label>
+          <button class="btn">Add</button>
+        </form>
+      </div>
+      <table class="grid" id="documents"><thead><tr><th>Source</th><th>Kind</th><th class="num">Chunks</th><th></th></tr></thead><tbody></tbody></table>
+    </section>
+
+    <section class="view page" id="v-settings" hidden>
+      <header class="page-head"><div><h1>Settings</h1><p>Saved to config.yaml next to the harness.</p></div></header>
+      <form id="settings" class="fields">
+        <label>Model <input id="llm" required><small>A CrewAI model name, for example anthropic/claude-opus-5-5.</small></label>
+        <label>Endpoint <input id="llm-base" placeholder="optional"><small>OpenAI-compatible base URL, for example http://localhost:11434/v1 for Ollama.</small></label>
+        <div class="actions"><button class="btn">Save</button></div>
+      </form>
+      <form id="token-form" class="fields">
+        <label>Admin token <input id="token" type="password" autocomplete="off"><small>Only needed when the server sets ANALYST_ADMIN_TOKEN. Kept in this browser.</small></label>
+        <div class="actions"><button class="btn quiet">Remember</button></div>
+      </form>
+    </section>
+  </main>
+</div>
+
+<dialog id="source-dialog">
+  <form id="source-form" class="fields">
+    <h2 id="source-title">Add source</h2>
+    <label id="preset-row">Start from <select id="preset"></select></label>
+    <label>Name <input name="name" pattern="[\w\-]+" required></label>
+    <fieldset class="choice">
+      <legend>Connection</legend>
+      <label><input type="radio" name="mode" value="stdio" checked> Local command</label>
+      <label><input type="radio" name="mode" value="remote"> Remote URL</label>
+    </fieldset>
+    <div data-mode="stdio">
+      <label>Command <input name="command" placeholder="npx"></label>
+      <label>Arguments <textarea name="args" rows="3" placeholder="one per line" spellcheck="false"></textarea></label>
+      <label>Environment <textarea name="env" rows="3" placeholder="KEY=value, one per line. ${VAR} reads the server's environment." spellcheck="false"></textarea></label>
+    </div>
+    <div data-mode="remote" hidden>
+      <label>URL <input name="url" placeholder="https://"></label>
+      <label>Transport <select name="transport"><option>streamable-http</option><option>sse</option></select></label>
+      <label>Headers <textarea name="headers" rows="2" placeholder="Authorization=Bearer ${TOKEN}" spellcheck="false"></textarea></label>
+    </div>
+    <label>Tools to expose <input name="tools" placeholder="all, or a comma-separated list"></label>
+    <label class="check"><input type="checkbox" name="allow_writes"> Allow statements that modify data</label>
+    <p class="error" id="source-error" hidden></p>
+    <div class="actions">
+      <button class="btn" id="source-save">Save and connect</button>
+      <button class="btn quiet" type="button" id="source-cancel">Cancel</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="confirm-dialog" class="small">
+  <form method="dialog" class="fields">
+    <h2 id="confirm-title"></h2>
+    <p id="confirm-text"></p>
+    <div class="actions">
+      <button class="btn danger" value="ok" id="confirm-ok">Delete</button>
+      <button class="btn quiet" value="cancel" autofocus>Cancel</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="notice" role="status" hidden></div>
+<script src="/static/app.js"></script>
+</body>
+</html>
