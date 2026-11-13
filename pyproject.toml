@@ -10,14 +10,18 @@ dependencies = [
     "uvicorn",
     "python-multipart",
     "pypdf",
+    "ollama",  # Ollama embeddings (embed_model in config.yaml)
 ]
-
-[project.optional-dependencies]
-dev = ["pytest"]
-local = ["ollama"]  # Ollama embeddings (embed_model in config.yaml)
 
 [project.scripts]
 analyst = "analyst.__main__:main"
+
+[dependency-groups]
+dev = ["pytest"]  # installed by `uv sync` by default
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 packages = ["analyst"]

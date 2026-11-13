@@ -27,15 +27,16 @@ A FastAPI server exposes the harness and a single-page web app manages it.
 ## Commands
 
 ```
-uv venv --python 3.12 && uv pip install -e ".[dev,local]"
-python -m analyst serve                 # http://127.0.0.1:8000
-python -m analyst ingest examples/docs
-pytest -k scripted                      # fast, needs nothing external
-pytest -k local                         # real crew on Ollama; several minutes
-python plugins/fiscal.py                # plugin self-check
+uv sync                                 # .venv, locked dependencies, pytest, `analyst` command
+uv run analyst serve                    # http://127.0.0.1:8000
+uv run analyst ingest examples/docs
+uv run pytest -k scripted               # fast, needs nothing external
+uv run pytest -k local                  # real crew on Ollama; several minutes
+uv run python plugins/fiscal.py         # plugin self-check
 ```
 
-Set `CREWAI_TRACING_ENABLED=false` and `CREWAI_DISABLE_TELEMETRY=true` when running tests.
+Add dependencies with `uv add <package>` (or `uv add --dev`) so `uv.lock` stays in step.
+`tests/conftest.py` turns off CrewAI tracing and telemetry for test runs.
 
 ## Conventions
 
@@ -52,6 +53,6 @@ Set `CREWAI_TRACING_ENABLED=false` and `CREWAI_DISABLE_TELEMETRY=true` when runn
 
 ## Before finishing a change
 
-1. `pytest -k scripted` passes.
+1. `uv run pytest -k scripted` passes.
 2. `node --check analyst/static/app.js` passes after front-end edits.
 3. Front-end changes are checked in the browser in both light and dark themes.

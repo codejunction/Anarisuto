@@ -153,23 +153,21 @@ wheels = [
 [[package]]
 name = "analyst"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "crewai", extra = ["anthropic"] },
     { name = "crewai-tools", extra = ["mcp"] },
     { name = "fastapi" },
+    { name = "ollama" },
     { name = "pypdf" },
     { name = "python-multipart", version = "0.0.32", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "python-multipart", version = "0.0.33", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "uvicorn" },
 ]
 
-[package.optional-dependencies]
+[package.dev-dependencies]
 dev = [
     { name = "pytest" },
-]
-local = [
-    { name = "ollama" },
 ]
 
 [package.metadata]
@@ -177,13 +175,14 @@ requires-dist = [
     { name = "crewai", extras = ["anthropic"], specifier = ">=1.15" },
     { name = "crewai-tools", extras = ["mcp"], specifier = ">=1.15" },
     { name = "fastapi" },
-    { name = "ollama", marker = "extra == 'local'" },
+    { name = "ollama" },
     { name = "pypdf" },
-    { name = "pytest", marker = "extra == 'dev'" },
     { name = "python-multipart" },
     { name = "uvicorn" },
 ]
-provides-extras = ["dev", "local"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest" }]
 
 [[package]]
 name = "annotated-doc"

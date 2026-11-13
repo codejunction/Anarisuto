@@ -1,4 +1,4 @@
-"""python -m analyst serve | ingest PATH... | ask QUESTION | catalog SERVER [HINT]"""
+"""uv run analyst serve | ingest PATH... | ask QUESTION | catalog SERVER [HINT]"""
 import argparse
 import pathlib
 

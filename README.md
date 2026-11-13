@@ -7,15 +7,21 @@ report must cite those ids; citations that match no result are flagged.
 
 ## Run
 
+Needs [uv](https://docs.astral.sh/uv/). `uv sync` creates `.venv` with Python 3.12, the
+dependencies from `uv.lock`, pytest, and the `analyst` command.
+
 ```
-uv venv --python 3.12 && uv pip install -e ".[dev,local]"
+uv sync
 ollama pull qwen3:4b && ollama pull embeddinggemma:300m   # or set a hosted model, see below
-python -m analyst ingest examples/docs   # the example documents
-python -m analyst serve                  # http://127.0.0.1:8000
-python -m analyst ask "Which region grew fastest last quarter?"
-python -m analyst catalog demo_sales     # an agent explores a source and writes notes about it
-pytest -k scripted                       # end-to-end test, scripted model, needs nothing
+uv run analyst ingest examples/docs    # the example documents
+uv run analyst serve                   # http://127.0.0.1:8000
+uv run analyst ask "Which region grew fastest last quarter?"
+uv run analyst catalog demo_sales      # an agent explores a source and writes notes about it
+uv run pytest -k scripted              # end-to-end test, scripted model, needs nothing
 ```
+
+`uv run analyst serve --host 0.0.0.0 --port 9000` changes the address; `--config other.yaml`
+(before the subcommand) uses another config file.
 
 ## Examples
 
@@ -74,7 +80,7 @@ reverse proxy every request looks local, so set the token there.
 takes several minutes on a 4B model. For a hosted model set `llm: anthropic/claude-opus-5-5`
 (with `ANTHROPIC_API_KEY`) and remove `llm_base_url`, here or under Settings. Remove
 `embed_model` to use Chroma's built-in embedder; each embedder has its own collection, so
-switching means ingesting again. `pytest -k local` runs the real crew on Ollama.
+switching means ingesting again. `uv run pytest -k local` runs the real crew on Ollama.
 
 An MCP source with `command: python` runs with the interpreter that runs the harness.
 
